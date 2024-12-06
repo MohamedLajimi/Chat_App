@@ -5,7 +5,6 @@ import Login from "./screens/Login";
 import Register from "./screens/Register";
 import { ToastProvider } from "react-native-toast-notifications";
 import Home from "./screens/Home";
-import { MaterialIcons } from "@expo/vector-icons";
 
 const Stack = createStackNavigator();
 

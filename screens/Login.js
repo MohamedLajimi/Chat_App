@@ -10,8 +10,9 @@ import {
     Image,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import firebase from "../config";
+import firebase from "../config/FirebaseConfig";
 import { useToast } from "react-native-toast-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Login = () => {
     const navigator = useNavigation();
@@ -21,11 +22,23 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
     const toast = useToast();
 
+    const showToast = (message, type) =>
+        toast.show(message, {
+            type,
+            icon: (
+                <MaterialIcons
+                    size={25}
+                    name={type === "success" ? "done" : "error"}
+                    color="white"
+                />
+            ),
+        });
+
     const handleSubmit = async () => {
         if (!email || !password) {
-            toast.show("Make sure to fill in all fields.", {
+            showToast("Make sure to fill in all fields.", {
                 type: "danger",
-                icon: <MaterialIcons name="error" size={25} color="white" />,
+
             });
             return;
         }
@@ -33,14 +46,18 @@ const Login = () => {
         try {
             setIsLoading(true);
             await firebase.auth().signInWithEmailAndPassword(email, password);
-            navigator.reset({
-                index: 0,
-                routes: [{ name: 'Home' }],
-            });
+            const userId = firebase.auth().currentUser.uid;
+            const firestore = firebase.firestore();
+            const userDocRef = firestore.collection('users').doc(userId);
+            await userDocRef.set({
+                connected: true
+            }, { merge: true });
+            await AsyncStorage.setItem("userId", userId);
+            navigator.replace('Home');
         } catch (error) {
-            toast.show(error.message, {
+            showToast('Invalid credentials.', {
                 type: "danger",
-                icon: <MaterialIcons name="error" size={20} color="white" />,
+
             });
         } finally {
             setIsLoading(false);
@@ -115,7 +132,7 @@ const styles = StyleSheet.create({
     },
     logo: {
         marginTop: 50,
-        width: 80,
+        width: 100,
         height: 80,
         alignSelf: "center",
     },

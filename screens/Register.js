@@ -1,20 +1,23 @@
 import React, { useState } from "react";
+import { 
+  KeyboardAvoidingView, 
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  View, 
+  Image, 
+  Platform, 
+  ScrollView, 
+  TouchableWithoutFeedback, 
+  Keyboard 
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  KeyboardAvoidingView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Image,
-  Platform,
-  ScrollView,
-} from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import firebase from "../config";
+import firebase from "../config/FirebaseConfig";
 import { useToast } from "react-native-toast-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Register = () => {
   const navigator = useNavigation();
@@ -38,11 +41,22 @@ const Register = () => {
       ),
     });
 
-    
+  const validateEmail = (email) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleSubmit = async () => {
     if (!email || !password || !confirmPassword) {
       showToast("Make sure to fill in all fields.", "danger");
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      showToast("Please enter a valid email.", "danger");
+      return;
+    }
+
+    if (password.length < 6) {
+      showToast("Password must be at least 6 characters long.", "danger");
       return;
     }
 
@@ -55,12 +69,19 @@ const Register = () => {
       setIsLoading(true);
       await firebase.auth().createUserWithEmailAndPassword(email, password);
       showToast("Account created successfully.", "success");
-      navigator.reset({
-        index: 0, 
-        routes: [{ name: 'Home' }], 
-      });
+      const userId=firebase.auth().currentUser.uid;
+      const userDocRef = firebase.firestore().collection('users').doc(userId);
+      await userDocRef.set({
+          connected: true
+      }, { merge: true });
+      await AsyncStorage.setItem("userId", userId);
+      navigator.replace('Edit-Profile');
     } catch (error) {
-      showToast(error.message, "danger");
+      const errorMessage =
+        error.code === "auth/email-already-in-use"
+          ? "Email already in use."
+          : error.message;
+      showToast(errorMessage, "danger");
     } finally {
       setIsLoading(false);
     }
@@ -68,108 +89,112 @@ const Register = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Image
-          style={styles.logo}
-          source={require("../assets/app-logo.png")}
-        />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <Image
+            style={styles.logo}
+            source={require("../assets/app-logo.png")}
+          />
 
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            Create an account to start an amazing journey with us.
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            Please enter a valid email and password to continue!
-          </Text>
-        </View>
-
-        <KeyboardAvoidingView
-          style={styles.form}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={styles.inputContainer}>
-            <MaterialIcons
-              name="email"
-              size={20}
-              color="#42a5f5"
-              style={styles.icon}
-            />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              style={styles.textInput}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <MaterialIcons
-              name="lock"
-              size={20}
-              color="#42a5f5"
-              style={styles.icon}
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={obscureText}
-              style={styles.textInput}
-              placeholder="Enter your password"
-            />
-            <MaterialIcons
-              onPress={() => setObscureText(!obscureText)}
-              name={obscureText ? "visibility-off" : "visibility"}
-              size={20}
-              color="grey"
-              style={styles.icon}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <MaterialIcons
-              name="lock"
-              size={20}
-              color="#42a5f5"
-              style={styles.icon}
-            />
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={obscureConfirmText}
-              style={styles.textInput}
-              placeholder="Confirm your password"
-            />
-            <MaterialIcons
-              onPress={() => setObscureConfirmText(!obscureConfirmText)}
-              name={obscureConfirmText ? "visibility-off" : "visibility"}
-              size={20}
-              color="grey"
-              style={styles.icon}
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={handleSubmit}
-            style={styles.button}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {isLoading ? "Loading..." : "Sign up"}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>
+              Create an account to start an amazing journey with us.
             </Text>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+            <Text style={styles.headerSubtitle}>
+              Please enter a valid email and password to continue!
+            </Text>
+          </View>
 
-        <View style={styles.bottom}>
-          <Text>Already have an account?</Text>
-          <TouchableOpacity onPress={() => navigator.navigate("Login")}>
-            <Text style={styles.textButton}>Sign in</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+          <KeyboardAvoidingView
+            style={styles.form}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="email"
+                size={20}
+                color="#42a5f5"
+                style={styles.icon}
+              />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                style={styles.textInput}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="lock"
+                size={20}
+                color="#42a5f5"
+                style={styles.icon}
+              />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={obscureText}
+                style={styles.textInput}
+                placeholder="Enter your password"
+              />
+              <MaterialIcons
+                onPress={() => setObscureText(!obscureText)}
+                name={obscureText ? "visibility-off" : "visibility"}
+                size={20}
+                color="grey"
+                style={styles.icon}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="lock"
+                size={20}
+                color="#42a5f5"
+                style={styles.icon}
+              />
+              <TextInput
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={obscureConfirmText}
+                style={styles.textInput}
+                placeholder="Confirm your password"
+              />
+              <MaterialIcons
+                onPress={() => setObscureConfirmText(!obscureConfirmText)}
+                name={obscureConfirmText ? "visibility-off" : "visibility"}
+                size={20}
+                color="grey"
+                style={styles.icon}
+              />
+            </View>
+
+            <TouchableOpacity
+              onPress={handleSubmit}
+              style={styles.button}
+              disabled={isLoading}
+            >
+              <Text style={styles.buttonText}>
+                {isLoading ? "Loading..." : "Sign up"}
+              </Text>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+
+          <View style={styles.bottom}>
+            <Text>Already have an account?</Text>
+            <TouchableOpacity onPress={() => navigator.navigate("Login")}>
+              <Text style={styles.textButton}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -183,7 +208,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     marginTop: 50,
-    width: 80,
+    width: 100,
     height: 80,
     alignSelf: "center",
   },
